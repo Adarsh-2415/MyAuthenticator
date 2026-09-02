@@ -6,8 +6,7 @@ plugins {
 
 android {
     namespace = "com.myauthenticator.authenticator"
-    compileSdk = 34
-    ndkVersion = flutter.ndkVersion
+    compileSdk = flutter.compileSdkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -17,15 +16,12 @@ android {
     defaultConfig {
         applicationId = "com.myauthenticator.authenticator"
         minSdk = 21
-        targetSdk = 34
+        targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
-        debug {
-            signingConfig = signingConfigs.getByName("debug")
-        }
         release {
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
