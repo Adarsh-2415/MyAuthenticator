@@ -35,16 +35,21 @@ jobs:
       - name: Build Release APK
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Copy & Rename APK
+      - name: Sign & ZipAlign APK for Device Compatibility
+        uses: AndroidIDEOfficial/uber-apk-signer-action@v1.1
+        with:
+          apk-file-path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Prepare APK Asset
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk MyAuthenticator.apk
+          cp build/app/outputs/flutter-apk/app-release-aligned-signed.apk MyAuthenticator.apk
 
       - name: Create or Update Tagged Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0
           name: MyAuthenticator v1.0.0 Release
-          body: "Production release build of MyAuthenticator. Direct .apk download without zip archiving."
+          body: "Production release build of MyAuthenticator. Zip-aligned & signed with V1/V2/V3 Android signatures for 100% device compatibility."
           files: MyAuthenticator.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
