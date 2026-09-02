@@ -40,13 +40,8 @@ jobs:
       - name: Build Release APK
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Sign & ZipAlign APK
-        uses: AndroidIDEOfficial/uber-apk-signer-action@v1.1
-        with:
-          apk-file-path: build/app/outputs/flutter-apk/app-release.apk
-
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: MyAuthenticator-release-apk
-          path: build/app/outputs/flutter-apk/app-release-aligned-signed.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
