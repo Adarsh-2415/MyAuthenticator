@@ -37,20 +37,17 @@ jobs:
       - name: Run Automated Unit & Widget Tests
         run: flutter test
 
-      - name: Build Debug APK
-        run: flutter build apk --debug
+      - name: Build Split ABI Release APKs
+        run: flutter build apk --release --split-per-abi --no-tree-shake-icons
 
-      - name: Build Release APK
-        run: flutter build apk --release --no-tree-shake-icons
-
-      - name: Upload Debug APK Artifact
+      - name: Upload ARM64 64-bit APK Artifact (For Modern Phones)
         uses: actions/upload-artifact@v4
         with:
-          name: MyAuthenticator-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: MyAuthenticator-arm64-v8a-apk
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 
-      - name: Upload Release APK Artifact
+      - name: Upload Universal Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: MyAuthenticator-release-apk
+          name: MyAuthenticator-universal-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
