@@ -37,10 +37,19 @@ jobs:
       - name: Run Automated Unit & Widget Tests
         run: flutter test
 
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
       - name: Build Release APK
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload APK Artifact
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyAuthenticator-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: MyAuthenticator-release-apk

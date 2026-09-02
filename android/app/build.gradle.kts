@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         applicationId = "com.myauthenticator.authenticator"
-        minSdk = 23
+        minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
