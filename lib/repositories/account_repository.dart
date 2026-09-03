@@ -100,10 +100,12 @@ class AccountRepository {
         if (secret != null && secret.isNotEmpty) {
           _inMemorySecretCache[account.id] = secret;
         } else {
+          // Secret is missing/deleted from storage -> clear session cache
           _inMemorySecretCache.remove(account.id);
+          secret = null;
         }
       } catch (_) {
-        // Fallback to session in-memory secret cache on storage exception
+        // Platform storage read exception -> fallback to session in-memory cache
         secret = _inMemorySecretCache[account.id];
       }
 
