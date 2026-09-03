@@ -76,9 +76,9 @@ class AccountRepository {
     final progress = remainingSeconds / period;
     final currentCounter = currentUnix ~/ period;
 
-    // 1. Return cached OTP code if time window counter has not changed
+    // 1. Return cached OTP code if time window counter has not changed AND cached OTP is valid (not fallback '••••••')
     final cached = _otpWindowCache[account.id];
-    if (cached != null && cached.timeWindowCounter == currentCounter) {
+    if (cached != null && cached.otpCode != '••••••' && cached.timeWindowCounter == currentCounter) {
       return OtpDisplayData(
         accountId: account.id,
         otpCode: cached.otpCode,
@@ -88,10 +88,11 @@ class AccountRepository {
       );
     }
 
-    // 2. Window changed or first fetch: Read secret & generate new TOTP
+    // 2. Window changed, un-cached, or retrying after fallback: Read secret & generate new TOTP
     try {
       final secret = await _storageService.readAccountSecret(account.id);
       if (secret == null || secret.isEmpty) {
+        _otpWindowCache.remove(account.id);
         return OtpDisplayData(
           accountId: account.id,
           otpCode: '••••••',
@@ -109,11 +110,13 @@ class AccountRepository {
         timestampSeconds: currentUnix,
       );
 
-      // Store in window cache for current counter window
-      _otpWindowCache[account.id] = _OtpCacheEntry(
-        timeWindowCounter: currentCounter,
-        otpCode: otpCode,
-      );
+      // Store in window cache ONLY if TOTP generation produces a valid numeric OTP (never cache error fallback)
+      if (otpCode != '••••••') {
+        _otpWindowCache[account.id] = _OtpCacheEntry(
+          timeWindowCounter: currentCounter,
+          otpCode: otpCode,
+        );
+      }
 
       return OtpDisplayData(
         accountId: account.id,
@@ -123,6 +126,7 @@ class AccountRepository {
         progress: progress,
       );
     } catch (_) {
+      _otpWindowCache.remove(account.id);
       return OtpDisplayData(
         accountId: account.id,
         otpCode: '••••••',
@@ -192,6 +196,7 @@ class AccountRepository {
     );
 
     // 5. Atomic Storage Strategy with Rollback
+    _otpWindowCache.remove(newId);
     await _storageService.writeAccountSecret(newId, normalizedSecret);
 
     try {
@@ -199,6 +204,7 @@ class AccountRepository {
       final jsonString = jsonEncode(updatedList.map((a) => a.toJson()).toList());
       await _storageService.writeAccountMetadata(jsonString);
     } catch (e) {
+      _otpWindowCache.remove(newId);
       await _storageService.deleteAccountSecret(newId);
       throw Exception('Unable to save account metadata. Creation rolled back.');
     }
