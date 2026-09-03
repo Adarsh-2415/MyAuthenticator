@@ -6,7 +6,6 @@
 
     <application
         android:label="MyAuthenticator"
-        android:name="android.app.Application"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:fullBackupContent="false">
