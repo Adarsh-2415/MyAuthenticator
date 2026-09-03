@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'web_storage_stub.dart' if (dart.library.html) 'web_storage_helper.dart';
 
 /// Low-level storage service interfacing with platform-protected secure storage
-/// (Android Keystore / iOS Keychain / WebStorage) with transparent in-memory fallback.
+/// (Android Keystore / iOS Keychain / WebStorage) with transparent in-memory and web fallback.
 class SecureStorageService {
   static const String _accountsMetadataKey = 'myauthenticator_accounts';
   static const String _settingsKey = 'myauthenticator_settings';
@@ -20,15 +22,15 @@ class SecureStorageService {
               iOptions: IOSOptions(
                 accessibility: KeychainAccessibility.first_unlock_this_device,
               ),
-              webOptions: WebOptions(
-                dbName: 'MyAuthenticatorSecureStorage',
-                publicKey: 'MyAuthenticatorApp',
-              ),
             );
 
   /// Saves serialized account metadata JSON string.
   Future<void> writeAccountMetadata(String jsonString) async {
     _inMemoryFallbackStorage[_accountsMetadataKey] = jsonString;
+    if (kIsWeb) {
+      WebStorageHelper.write(_accountsMetadataKey, jsonString);
+      return;
+    }
     try {
       await _storage.write(key: _accountsMetadataKey, value: jsonString);
     } catch (_) {}
@@ -36,6 +38,10 @@ class SecureStorageService {
 
   /// Reads serialized account metadata JSON string.
   Future<String?> readAccountMetadata() async {
+    if (kIsWeb) {
+      final webVal = WebStorageHelper.read(_accountsMetadataKey);
+      if (webVal != null && webVal.isNotEmpty) return webVal;
+    }
     try {
       final val = await _storage.read(key: _accountsMetadataKey);
       if (val != null && val.isNotEmpty) {
@@ -49,6 +55,10 @@ class SecureStorageService {
   /// Saves non-sensitive application settings JSON string.
   Future<void> writeAppSettings(String jsonString) async {
     _inMemoryFallbackStorage[_settingsKey] = jsonString;
+    if (kIsWeb) {
+      WebStorageHelper.write(_settingsKey, jsonString);
+      return;
+    }
     try {
       await _storage.write(key: _settingsKey, value: jsonString);
     } catch (_) {}
@@ -56,6 +66,10 @@ class SecureStorageService {
 
   /// Reads non-sensitive application settings JSON string.
   Future<String?> readAppSettings() async {
+    if (kIsWeb) {
+      final webVal = WebStorageHelper.read(_settingsKey);
+      if (webVal != null && webVal.isNotEmpty) return webVal;
+    }
     try {
       final val = await _storage.read(key: _settingsKey);
       if (val != null && val.isNotEmpty) {
@@ -70,6 +84,10 @@ class SecureStorageService {
   Future<void> writeAccountSecret(String accountId, String secret) async {
     final key = '$_secretKeyPrefix$accountId';
     _inMemoryFallbackStorage[key] = secret;
+    if (kIsWeb) {
+      WebStorageHelper.write(key, secret);
+      return;
+    }
     try {
       await _storage.write(key: key, value: secret);
     } catch (_) {}
@@ -78,6 +96,10 @@ class SecureStorageService {
   /// Reads a TOTP secret for a given account ID.
   Future<String?> readAccountSecret(String accountId) async {
     final key = '$_secretKeyPrefix$accountId';
+    if (kIsWeb) {
+      final webVal = WebStorageHelper.read(key);
+      if (webVal != null && webVal.isNotEmpty) return webVal;
+    }
     try {
       final val = await _storage.read(key: key);
       if (val != null && val.isNotEmpty) {
@@ -92,6 +114,10 @@ class SecureStorageService {
   Future<void> deleteAccountSecret(String accountId) async {
     final key = '$_secretKeyPrefix$accountId';
     _inMemoryFallbackStorage.remove(key);
+    if (kIsWeb) {
+      WebStorageHelper.delete(key);
+      return;
+    }
     try {
       await _storage.delete(key: key);
     } catch (_) {}
@@ -100,6 +126,10 @@ class SecureStorageService {
   /// Clears all stored data (used for security reset/tests).
   Future<void> deleteAllData() async {
     _inMemoryFallbackStorage.clear();
+    if (kIsWeb) {
+      WebStorageHelper.deleteAll();
+      return;
+    }
     try {
       await _storage.deleteAll();
     } catch (_) {}
