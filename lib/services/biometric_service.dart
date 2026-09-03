@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -22,6 +23,7 @@ class BiometricService {
 
   /// Checks if hardware biometrics or device passcode authentication is available.
   Future<bool> isDeviceSupported() async {
+    if (kIsWeb) return true;
     try {
       final bool canCheckBiometrics = await _auth.canCheckBiometrics;
       final bool isDeviceSupported = await _auth.isDeviceSupported();
@@ -36,6 +38,10 @@ class BiometricService {
   Future<BiometricAuthResult> authenticate({
     String reason = 'Authenticate to access MyAuthenticator',
   }) async {
+    if (kIsWeb) {
+      return BiometricAuthResult.success;
+    }
+
     if (_isAuthenticating) {
       return BiometricAuthResult.cancelled;
     }

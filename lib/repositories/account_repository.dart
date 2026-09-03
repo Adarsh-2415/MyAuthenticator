@@ -27,6 +27,10 @@ class AccountRepository {
   // Invalidated automatically whenever time window changes or account is edited/deleted.
   final Map<String, _OtpCacheEntry> _otpWindowCache = {};
 
+  // In-memory secret cache mapping accountId -> normalized Base32 secret string.
+  // Provides zero-latency, resilient secret retrieval during active runtime session.
+  final Map<String, String> _inMemorySecretCache = {};
+
   AccountRepository({
     SecureStorageService? storageService,
     Uuid? uuid,
@@ -88,9 +92,21 @@ class AccountRepository {
       );
     }
 
-    // 2. Window changed or first fetch: Read secret & generate new TOTP
+    // 2. Window changed or first fetch: Retrieve secret & generate new TOTP
     try {
-      final secret = await _storageService.readAccountSecret(account.id);
+      String? secret;
+      try {
+        secret = await _storageService.readAccountSecret(account.id);
+        if (secret != null && secret.isNotEmpty) {
+          _inMemorySecretCache[account.id] = secret;
+        } else {
+          _inMemorySecretCache.remove(account.id);
+        }
+      } catch (_) {
+        // Fallback to session in-memory secret cache on storage exception
+        secret = _inMemorySecretCache[account.id];
+      }
+
       if (secret == null || secret.isEmpty) {
         return OtpDisplayData(
           accountId: account.id,
@@ -191,7 +207,8 @@ class AccountRepository {
       updatedAt: now,
     );
 
-    // 5. Atomic Storage Strategy with Rollback
+    // 5. Cache in Memory & Atomic Storage Strategy with Rollback
+    _inMemorySecretCache[newId] = normalizedSecret;
     await _storageService.writeAccountSecret(newId, normalizedSecret);
 
     try {
@@ -199,6 +216,7 @@ class AccountRepository {
       final jsonString = jsonEncode(updatedList.map((a) => a.toJson()).toList());
       await _storageService.writeAccountMetadata(jsonString);
     } catch (e) {
+      _inMemorySecretCache.remove(newId);
       await _storageService.deleteAccountSecret(newId);
       throw Exception('Unable to save account metadata. Creation rolled back.');
     }
@@ -258,6 +276,9 @@ class AccountRepository {
     final existing = await getAccountById(id);
     if (existing == null) return;
 
+    _inMemorySecretCache.remove(id);
+    _otpWindowCache.remove(id);
+
     try {
       await _storageService.deleteAccountSecret(id);
     } catch (_) {}
@@ -266,8 +287,5 @@ class AccountRepository {
     final updatedList = accounts.where((acc) => acc.id != id).toList();
     final jsonString = jsonEncode(updatedList.map((a) => a.toJson()).toList());
     await _storageService.writeAccountMetadata(jsonString);
-
-    // Invalidate window cache for deleted account
-    _otpWindowCache.remove(id);
   }
 }
