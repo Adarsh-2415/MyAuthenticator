@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/otp_display_data.dart';
 import '../../models/totp_account.dart';
 import '../tokens/app_colors.dart';
 import '../tokens/app_dimensions.dart';
@@ -11,6 +12,7 @@ class AccountCard extends StatelessWidget {
   final TotpAccount account;
   final String mockOtp;
   final int remainingSeconds;
+  final OtpFailureCategory failureCategory;
   final VoidCallback onTap;
   final VoidCallback onCopy;
 
@@ -19,6 +21,7 @@ class AccountCard extends StatelessWidget {
     required this.account,
     required this.mockOtp,
     required this.remainingSeconds,
+    this.failureCategory = OtpFailureCategory.none,
     required this.onTap,
     required this.onCopy,
   });
@@ -100,7 +103,19 @@ class AccountCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    OtpDisplay(rawOtp: mockOtp),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        OtpDisplay(rawOtp: mockOtp),
+                        if (failureCategory != OtpFailureCategory.none) ...[
+                          const SizedBox(height: AppSpacing.xs4),
+                          Text(
+                            'Status: ${failureCategory.name}',
+                            style: theme.textTheme.labelSmall?.copyWith(color: AppColors.error),
+                          ),
+                        ],
+                      ],
+                    ),
                     IconButton(
                       icon: const Icon(Icons.copy_outlined, size: 20.0),
                       onPressed: onCopy,

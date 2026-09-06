@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:authenticator/core/utils/account_validator.dart';
+import 'package:authenticator/models/otp_display_data.dart';
 import 'package:authenticator/repositories/account_repository.dart';
 import 'package:authenticator/services/secure_storage_service.dart';
 
@@ -94,7 +95,7 @@ void main() {
       expect(metadataJson!.contains('JBSWY3DPEHPK3PXP'), isFalse);
     });
 
-    test('generateOtpDisplayData caches OTP per time window counter', () async {
+    test('generateOtpDisplayData produces real numeric OTP and caches per time window counter', () async {
       final account = await repository.createAccount(
         issuer: 'Google',
         accountName: 'test@example.com',
@@ -106,6 +107,8 @@ void main() {
       // Window 0 (timestamp 20s)
       final otp2 = await repository.generateOtpDisplayData(account, timestampSeconds: 20);
 
+      expect(RegExp(r'^\d{6}$').hasMatch(otp1.otpCode), isTrue);
+      expect(otp1.failureCategory, equals(OtpFailureCategory.none));
       expect(otp1.otpCode, equals(otp2.otpCode));
       expect(otp1.remainingSeconds, equals(20));
       expect(otp2.remainingSeconds, equals(10));
@@ -115,7 +118,7 @@ void main() {
       expect(otp3.remainingSeconds, equals(30));
     });
 
-    test('handles missing secret gracefully without crashing', () async {
+    test('handles missing secret gracefully without caching failure fallback', () async {
       final account = await repository.createAccount(
         issuer: 'Google',
         accountName: 'test@example.com',
@@ -127,7 +130,14 @@ void main() {
 
       final displayData = await repository.generateOtpDisplayData(account, timestampSeconds: 15);
       expect(displayData.otpCode, equals('••••••'));
+      expect(displayData.failureCategory, equals(OtpFailureCategory.secretMissing));
       expect(displayData.remainingSeconds, equals(15));
+
+      // Re-write secret to simulate recovery
+      await storageService.writeAccountSecret(account.id, 'JBSWY3DPEHPK3PXP');
+      final recoveredData = await repository.generateOtpDisplayData(account, timestampSeconds: 16);
+      expect(RegExp(r'^\d{6}$').hasMatch(recoveredData.otpCode), isTrue);
+      expect(recoveredData.failureCategory, equals(OtpFailureCategory.none));
     });
 
     test('duplicate account creation is rejected', () async {
@@ -215,6 +225,29 @@ void main() {
       await repository.deleteAccount('non-existent-id');
       final all = await repository.getAllAccounts();
       expect(all, isEmpty);
+    });
+
+    test('multi-instance SecureStorageService & AccountRepository shares secret fallback map and generates numeric OTP', () async {
+      final storage1 = SecureStorageService();
+      final repo1 = AccountRepository(storageService: storage1);
+
+      final account = await repo1.createAccount(
+        issuer: 'Google',
+        accountName: 'user@example.com',
+        secret: 'JBSWY3DPEHPK3PXP',
+      );
+
+      // Create separate service & repository instances (simulating QrScannerScreen vs AccountsHomeScreen)
+      final storage2 = SecureStorageService();
+      final repo2 = AccountRepository(storageService: storage2);
+
+      final secretRead = await storage2.readAccountSecret(account.id);
+      expect(secretRead, equals('JBSWY3DPEHPK3PXP'));
+
+      final displayData = await repo2.generateOtpDisplayData(account, timestampSeconds: 1000);
+      expect(RegExp(r'^\d{6}$').hasMatch(displayData.otpCode), isTrue);
+      expect(displayData.failureCategory, equals(OtpFailureCategory.none));
+      expect(displayData.otpCode, isNot(equals('••••••')));
     });
   });
 }

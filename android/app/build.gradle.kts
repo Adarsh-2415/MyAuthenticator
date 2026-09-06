@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "com.myauthenticator.authenticator"
     compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -15,23 +16,15 @@ android {
 
     defaultConfig {
         applicationId = "com.myauthenticator.authenticator"
-        minSdk = 21
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
-    signingConfigs {
-        getByName("debug") {
-            // Explicit debug keystore reference
-        }
-    }
-
     buildTypes {
-        debug {
-            signingConfig = signingConfigs.getByName("debug")
-        }
         release {
+            // Signing with debug keys by default for testing until production keystore is provided.
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
             isShrinkResources = false

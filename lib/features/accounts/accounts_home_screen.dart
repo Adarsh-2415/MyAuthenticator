@@ -174,6 +174,7 @@ class AccountsHomeScreenState extends State<AccountsHomeScreen> {
                           account: account,
                           mockOtp: displayData.otpCode,
                           remainingSeconds: displayData.remainingSeconds,
+                          failureCategory: displayData.failureCategory,
                           onTap: () => widget.onAccountSelected(account.id),
                           onCopy: () => _copyOtp(displayData.otpCode, account.issuer),
                         );

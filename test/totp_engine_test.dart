@@ -172,6 +172,27 @@ void main() {
       expect(RegExp(r'^\d{8}$').hasMatch(otp), isTrue);
     });
 
+    test('decodes Base32 secret with and without padding', () {
+      // "hello" in Base32 is "NBSWY3DP"
+      final otp1 = TotpEngine.generateTotp(
+        secret: 'NBSWY3DP',
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+        timestampSeconds: 1000,
+      );
+      // "foo" in Base32 is "MZXW6==="
+      final otp2 = TotpEngine.generateTotp(
+        secret: 'MZXW6===',
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+        timestampSeconds: 1000,
+      );
+      expect(otp1.length, equals(6));
+      expect(otp2.length, equals(6));
+    });
+
     test('rejects invalid digit count or unsupported algorithm', () {
       expect(
         () => TotpEngine.generateTotp(
@@ -180,7 +201,7 @@ void main() {
           digits: 7,
           period: 30,
         ),
-        throwsA(isA<Exception>()),
+        throwsA(isA<TotpEngineException>()),
       );
 
       expect(
@@ -190,7 +211,111 @@ void main() {
           digits: 6,
           period: 30,
         ),
-        throwsA(isA<Exception>()),
+        throwsA(isA<TotpEngineException>()),
+      );
+    });
+  });
+
+  group('TotpEngine Base32 Decoding & Algorithm Normalization Verification', () {
+    test('TotpEngine.decodeSecret handles valid secrets of various formats', () {
+      // 1. Standard 16-char secret
+      final bytes1 = TotpEngine.decodeSecret('JBSWY3DPEHPK3PXP');
+      expect(bytes1.isNotEmpty, isTrue);
+
+      // 2. Secret with hyphens
+      final bytes2 = TotpEngine.decodeSecret('JBSW-Y3DP-EHPK-3PXP');
+      expect(bytes2, equals(bytes1));
+
+      // 3. Lowercase secret
+      final bytes3 = TotpEngine.decodeSecret('jbswy3dpehpk3pxp');
+      expect(bytes3, equals(bytes1));
+
+      // 4. Valid padded secret
+      final bytes4 = TotpEngine.decodeSecret('JBSWY3DPEHPK3PXP====');
+      expect(bytes4, equals(bytes1));
+
+      // 5. RFC-compatible Base32 strings of various valid lengths
+      // 10 chars: "NBSWY3DPQI======" -> "hello!"
+      final b10 = TotpEngine.decodeSecret('NBSWY3DPQI');
+      expect(b10.isNotEmpty, isTrue);
+
+      // 26 chars: "MZXW6YTBOI======="
+      final b26 = TotpEngine.decodeSecret('MZXW6YTBOI');
+      expect(b26.isNotEmpty, isTrue);
+    });
+
+    test('TotpEngine.generateTotp normalizes algorithm variations like SHA-1, sha-1, SHA 1', () {
+      const secret = 'JBSWY3DPEHPK3PXP';
+      final otp1 = TotpEngine.generateTotp(
+        secret: secret,
+        algorithm: 'SHA-1',
+        digits: 6,
+        period: 30,
+        timestampSeconds: 1000,
+      );
+
+      final otp2 = TotpEngine.generateTotp(
+        secret: secret,
+        algorithm: 'sha-1',
+        digits: 6,
+        period: 30,
+        timestampSeconds: 1000,
+      );
+
+      final otp3 = TotpEngine.generateTotp(
+        secret: secret,
+        algorithm: 'SHA 1',
+        digits: 6,
+        period: 30,
+        timestampSeconds: 1000,
+      );
+
+      final otpStandard = TotpEngine.generateTotp(
+        secret: secret,
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+        timestampSeconds: 1000,
+      );
+
+      expect(otp1, equals(otpStandard));
+      expect(otp2, equals(otpStandard));
+      expect(otp3, equals(otpStandard));
+    });
+  });
+
+  group('TotpEngine counterToBytes Verification', () {
+    test('counterToBytes(0) produces 8 zero bytes', () {
+      final bytes = TotpEngine.counterToBytes(0);
+      expect(bytes.length, equals(8));
+      expect(bytes, equals(Uint8List.fromList([0, 0, 0, 0, 0, 0, 0, 0])));
+    });
+
+    test('counterToBytes(1) produces 8-byte big-endian [0,0,0,0,0,0,0,1]', () {
+      final bytes = TotpEngine.counterToBytes(1);
+      expect(bytes.length, equals(8));
+      expect(bytes, equals(Uint8List.fromList([0, 0, 0, 0, 0, 0, 0, 1])));
+    });
+
+    test('counterToBytes for current Unix timestamp counter', () {
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final counter = TotpEngine.calculateCounter(timestampSeconds: now, period: 30);
+      final bytes = TotpEngine.counterToBytes(counter);
+
+      expect(bytes.length, equals(8));
+      expect(counter, greaterThan(0));
+      // Verify big-endian byte reconstruction
+      int reconstructed = 0;
+      for (int i = 0; i < 8; i++) {
+        reconstructed = (reconstructed * 256) + bytes[i];
+      }
+      expect(reconstructed, equals(counter));
+    });
+
+    test('counterToBytes throws TotpEngineException on negative counter', () {
+      expect(
+        () => TotpEngine.counterToBytes(-1),
+        throwsA(isA<TotpEngineException>()),
       );
     });
   });

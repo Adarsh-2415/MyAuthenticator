@@ -95,8 +95,14 @@ class _MyAuthenticatorAppState extends State<MyAuthenticatorApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
 
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
       _backgroundTimestamp ??= DateTime.now();
+      if (_appSettings.screenPrivacyEnabled) {
+        setState(() {
+          _isPrivacyOverlayActive = true;
+        });
+      }
+    } else if (state == AppLifecycleState.inactive) {
       if (_appSettings.screenPrivacyEnabled) {
         setState(() {
           _isPrivacyOverlayActive = true;
